@@ -54,7 +54,7 @@ jobs:
         uses: azure/k8s-deploy@v4
         with:
           manifests: |
-            k8s/deployment.yaml
-            k8s/service.yaml
+            ./k8s/deployment.yaml
+            ./k8s/service.yaml
           images: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
