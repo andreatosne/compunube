@@ -16,44 +16,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Clonar el código del repositorio
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2️⃣ Mostrar estructura real del repositorio
+      - name: Debug paths
+        run: |
+          echo "📂 Directorio actual:"
+          pwd
+          echo "📄 Contenido total:"
+          ls -R
+
+      # 3️⃣ Login en Azure
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      # 4️⃣ Login en el Container Registry
       - name: Log in to Azure Container Registry
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 👇 Verifica rutas y mueve los archivos YAML si hace falta
-      - name: Fix k8s path (force move)
-        run: |
-          echo "Contenido del repositorio actual:"
-          pwd
-          ls -R
-          mkdir -p /home/runner/work/compunube/k8s
-          cp -r k8s/* /home/runner/work/compunube/k8s/ || true
-          echo "✅ Archivos movidos a ruta absoluta"
-
+      # 5️⃣ Construir y subir imagen Docker
       - name: Build and Push Docker image
         run: |
           docker build . -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
 
+      # 6️⃣ Conectar al clúster de AKS
       - name: Set AKS context
         uses: azure/aks-set-context@v3
         with:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.AKS_CLUSTER }}
 
-      # 👇 Usa ruta ABSOLUTA a los archivos para que no falle
+      # 7️⃣ Forzar la ruta absoluta antes del despliegue
+      - name: Ensure k8s files exist
+        run: |
+          echo "🔍 Verificando archivos Kubernetes..."
+          if [ ! -f "$GITHUB_WORKSPACE/k8s/deployment.yaml" ]; then
+            echo "❌ No se encontró deployment.yaml"
+            exit 1
+          fi
+          if [ ! -f "$GITHUB_WORKSPACE/k8s/service.yaml" ]; then
+            echo "❌ No se encontró service.yaml"
+            exit 1
+          fi
+          echo "✅ Archivos encontrados correctamente."
+
+      # 8️⃣ Desplegar a AKS
       - name: Deploy to AKS
         uses: azure/k8s-deploy@v4
         with:
           manifests: |
-            /home/runner/work/compunube/k8s/deployment.yaml
-            /home/runner/work/compunube/k8s/service.yaml
+            ${{ github.workspace }}/k8s/deployment.yaml
+            ${{ github.workspace }}/k8s/service.yaml
           images: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
