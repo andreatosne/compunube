@@ -16,9 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Obtener el código del repositorio
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2️⃣ Mostrar estructura del repositorio (debug)
       - name: Debug repo structure
         run: |
           echo "📂 Directorio actual:"
@@ -26,38 +28,43 @@ jobs:
           echo "📄 Estructura completa del repositorio:"
           ls -R
 
+      # 3️⃣ Iniciar sesión en Azure
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      # 4️⃣ Iniciar sesión en el Azure Container Registry
       - name: Log in to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
+      # 5️⃣ Construir y subir la imagen Docker
       - name: Build and Push Docker image
         run: |
           docker build . -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
 
+      # 6️⃣ Conectarse al clúster AKS
       - name: Set AKS context
         uses: azure/aks-set-context@v3
         with:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.AKS_CLUSTER }}
 
-      # 👇 Nuevo paso: buscar los YAMLs en cualquier carpeta
+      # 7️⃣ Buscar automáticamente los archivos YAML
       - name: Find YAML manifests
         id: find
         run: |
           echo "🔍 Buscando deployment.yaml y service.yaml..."
           DEPLOY=$(find $GITHUB_WORKSPACE -name "deployment.yaml" | head -n 1)
           SERVICE=$(find $GITHUB_WORKSPACE -name "service.yaml" | head -n 1)
-          echo "deployment=${DEPLOY}" >> $GITHUB_OUTPUT
-          echo "service=${SERVICE}" >> $GITHUB_OUTPUT
-          echo "✅ Encontrados:"
+          echo "deployment=$DEPLOY" >> $GITHUB_OUTPUT
+          echo "service=$SERVICE" >> $GITHUB_OUTPUT
+          echo "✅ Archivos encontrados:"
           echo "Deployment: $DEPLOY"
           echo "Service: $SERVICE"
 
+      # 8️⃣ Desplegar en AKS
       - name: Deploy to AKS
         uses: azure/k8s-deploy@v4
         with:
