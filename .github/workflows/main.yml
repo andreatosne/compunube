@@ -30,11 +30,11 @@ jobs:
       - name: Log in to Azure Container Registry
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 4️⃣ Verificar la carpeta k8s dentro de compunube/
+      # 4️⃣ Verificar la carpeta k8s
       - name: Verify k8s folder
         run: |
-          echo "Contenido de la carpeta compunube/k8s:"
-          ls -la compunube/k8s
+          echo "Contenido de la carpeta k8s:"
+          ls -la k8s
 
       # 5️⃣ Construir y subir la imagen Docker al ACR
       - name: Build and Push Docker image
@@ -49,12 +49,12 @@ jobs:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.AKS_CLUSTER }}
 
-      # 7️⃣ Desplegar en AKS usando los archivos dentro de compunube/k8s/
+      # 7️⃣ Desplegar en AKS
       - name: Deploy to AKS
         uses: azure/k8s-deploy@v4
         with:
           manifests: |
-            compunube/k8s/deployment.yaml
-            compunube/k8s/service.yaml
+            k8s/deployment.yaml
+            k8s/service.yaml
           images: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
