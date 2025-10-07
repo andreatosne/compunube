@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Obtener el código del repositorio
+      # 1️⃣ Obtener el código
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -30,11 +30,12 @@ jobs:
       - name: Log in to Azure Container Registry
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 4️⃣ Verificar la carpeta k8s
-      - name: Verify k8s folder
+      # 4️⃣ Verificar estructura del repositorio
+      - name: Verificar estructura del repositorio
         run: |
-          echo "Contenido de la carpeta k8s:"
-          ls -la k8s
+          echo "📁 Contenido del repositorio completo:"
+          pwd
+          ls -R
 
       # 5️⃣ Construir y subir la imagen Docker al ACR
       - name: Build and Push Docker image
@@ -54,7 +55,7 @@ jobs:
         uses: azure/k8s-deploy@v4
         with:
           manifests: |
-            k8s/deployment.yaml
-            k8s/service.yaml
+            ./k8s/deployment.yaml
+            ./k8s/service.yaml
           images: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
