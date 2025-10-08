@@ -1,68 +1,49 @@
-name: CI/CD to Azure AKS
+name: CI/CD Pipeline para AKS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 env:
-  ACR_NAME: proyectossd
-  AKS_CLUSTER: aks-demo-cluster
-  RESOURCE_GROUP: rg-aks-demo
+  REGISTRY: proyectossd.azurecr.io
   IMAGE_NAME: guestbook-frontend
+  CLUSTER_NAME: aks-demo-cluster
+  RESOURCE_GROUP: rg-aks-demo
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # 1️⃣ Obtener código del repositorio
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
 
-      # 2️⃣ Mostrar estructura de carpetas (debug)
-      - name: Debug repo structure
-        run: |
-          echo "📂 Directorio actual:"
-          pwd
-          echo "📄 Archivos del repositorio:"
-          ls -R
+    - name: 🔐 Login a Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3️⃣ Iniciar sesión en Azure
-      - name: Log in to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - name: 🐳 Login a ACR
+      run: |
+        az acr login --name proyectossd
 
-      # 4️⃣ Iniciar sesión en Azure Container Registry
-      - name: Log in to ACR
-        run: az acr login --name ${{ env.ACR_NAME }}
+    - name: 🏗️ Build y Push de Imagen Docker
+      run: |
+        docker build -t $REGISTRY/$IMAGE_NAME:${{ github.sha }} .
+        docker push $REGISTRY/$IMAGE_NAME:${{ github.sha }}
 
-      # 5️⃣ Construir y subir la imagen Docker
-      - name: Build and Push Docker image
-        run: |
-          docker build . -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
-          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
+    - name: 🔧 Obtener credenciales de AKS
+      uses: azure/aks-set-context@v3
+      with:
+        resource-group: $RESOURCE_GROUP
+        cluster-name: $CLUSTER_NAME
 
-      # 6️⃣ Configurar conexión con AKS
-      - name: Set AKS context
-        uses: azure/aks-set-context@v3
-        with:
-          resource-group: ${{ env.RESOURCE_GROUP }}
-          cluster-name: ${{ env.AKS_CLUSTER }}
-
-      # 7️⃣ Verificar carpeta k8s en la raíz
-      - name: Verify k8s folder
-        run: |
-          echo "📂 Contenido de la carpeta k8s:"
-          ls -la k8s
-
-      # 8️⃣ Desplegar a AKS usando los YAML en raíz
-      - name: Deploy to AKS
-        uses: azure/k8s-deploy@v4
-        with:
-          manifests: |
-            k8s/deployment.yaml
-            k8s/service.yaml
-          images: |
-            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
+    - name: 🚀 Desplegar en AKS
+      uses: azure/k8s-deploy@v4
+      with:
+        namespace: 'default'
+        manifests: |
+          k8s/deployment.yaml
+          k8s/service.yaml
+        images: |
+          $REGISTRY/$IMAGE_NAME:${{ github.sha }}
