@@ -16,53 +16,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Clonar el repositorio
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Ver estructura del proyecto
       - name: Debug repo structure
         run: |
           echo "📂 Directorio actual:"
           pwd
-          echo "📄 Archivos encontrados:"
+          echo "📄 Archivos en el repo:"
           ls -R
 
-      # 3️⃣ Iniciar sesión en Azure
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 4️⃣ Iniciar sesión en el Azure Container Registry
       - name: Log in to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 5️⃣ Construir y subir la imagen Docker al ACR
       - name: Build and Push Docker image
         run: |
           docker build . -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
 
-      # 6️⃣ Establecer el contexto del clúster AKS
       - name: Set AKS context
         uses: azure/aks-set-context@v3
         with:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.AKS_CLUSTER }}
 
-      # 7️⃣ Verificar que existan los YAML en la subcarpeta correcta
       - name: Verify k8s folder
         run: |
-          echo "📂 Contenido de compunube/k8s:"
-          ls -la compunube/k8s
+          echo "📂 Contenido de la carpeta k8s:"
+          ls -la k8s
 
-      # 8️⃣ Desplegar en AKS usando los archivos dentro de compunube/k8s
       - name: Deploy to AKS
         uses: azure/k8s-deploy@v4
         with:
           manifests: |
-            compunube/k8s/deployment.yaml
-            compunube/k8s/service.yaml
+            k8s/deployment.yaml
+            k8s/service.yaml
           images: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
