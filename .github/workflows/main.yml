@@ -5,10 +5,8 @@ on:
     branches: [ main ]
 
 env:
-  REGISTRY: proyectossd.azurecr.io
+  REGISTRY: ${{ secrets.REGISTRY }}.azurecr.io
   IMAGE_NAME: guestbook-frontend
-  CLUSTER_NAME: aks-demo-cluster
-  RESOURCE_GROUP: rg-aks-demo
 
 jobs:
   build-and-deploy:
@@ -25,18 +23,18 @@ jobs:
 
     - name: 🐳 Login a ACR
       run: |
-        az acr login --name proyectossd
+        az acr login --name ${{ secrets.REGISTRY }}
 
     - name: 🏗️ Build y Push de Imagen Docker
       run: |
-        docker build -t $REGISTRY/$IMAGE_NAME:${{ github.sha }} .
-        docker push $REGISTRY/$IMAGE_NAME:${{ github.sha }}
+        docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
     - name: 🔧 Obtener credenciales de AKS
       uses: azure/aks-set-context@v3
       with:
-        resource-group: $RESOURCE_GROUP
-        cluster-name: $CLUSTER_NAME
+        resource-group: ${{ secrets.RESOURCE_GROUP }}
+        cluster-name: ${{ secrets.CLUSTER_NAME }}
 
     - name: 🚀 Desplegar en AKS
       uses: azure/k8s-deploy@v4
@@ -46,4 +44,4 @@ jobs:
           k8s/deployment.yaml
           k8s/service.yaml
         images: |
-          $REGISTRY/$IMAGE_NAME:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
