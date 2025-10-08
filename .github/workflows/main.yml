@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Descargar el repositorio completo
+      # 1️⃣ Descargar todo el repositorio (sin limitar profundidad)
       - name: Checkout full repository
         uses: actions/checkout@v4
         with:
@@ -53,26 +53,29 @@ jobs:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.AKS_CLUSTER }}
 
-      # 7️⃣ Verificar archivos YAML en todo el repositorio
+      # 7️⃣ Buscar automáticamente los YAMLs de despliegue
       - name: Find YAML manifests
         id: find
         run: |
           echo "🔍 Buscando deployment.yaml y service.yaml..."
-          DEPLOY=$(find $GITHUB_WORKSPACE -name "deployment.yaml" | head -n 1)
-          SERVICE=$(find $GITHUB_WORKSPACE -name "service.yaml" | head -n 1)
-          echo "deployment=${DEPLOY}" >> $GITHUB_OUTPUT
-          echo "service=${SERVICE}" >> $GITHUB_OUTPUT
+          DEPLOY=$(find . -type f -name "deployment.yaml" | head -n 1)
+          SERVICE=$(find . -type f -name "service.yaml" | head -n 1)
+          echo "deployment=$DEPLOY" >> $GITHUB_OUTPUT
+          echo "service=$SERVICE" >> $GITHUB_OUTPUT
           echo "✅ Archivos encontrados:"
           echo "Deployment: $DEPLOY"
           echo "Service: $SERVICE"
 
-      # 8️⃣ Listar todos los archivos YAML por diagnóstico adicional
-      - name: List all YAML files (debug)
+      # 8️⃣ Verificar si realmente se encontraron
+      - name: Validate found files
         run: |
-          echo "📜 Todos los YAML detectados en el repositorio:"
-          find $GITHUB_WORKSPACE -name "*.yaml" -type f
+          if [ -z "${{ steps.find.outputs.deployment }}" ] || [ -z "${{ steps.find.outputs.service }}" ]; then
+            echo "❌ No se encontraron los archivos deployment.yaml o service.yaml"
+            exit 1
+          fi
+          echo "✅ Archivos YAML detectados correctamente."
 
-      # 9️⃣ Desplegar en AKS usando los archivos encontrados
+      # 9️⃣ Desplegar en AKS usando las rutas detectadas dinámicamente
       - name: Deploy to AKS
         uses: azure/k8s-deploy@v4
         with:
