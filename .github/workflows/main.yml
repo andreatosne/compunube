@@ -1,4 +1,4 @@
-name: CI/CD to Azure AKS (Auto Fix)
+name: CI/CD to Azure AKS
 
 on:
   push:
@@ -16,11 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Obtener código del repositorio
+      # 1️⃣ Obtener el código del repositorio
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Ver estructura de carpetas (debug visual)
+      # 2️⃣ Mostrar estructura de carpetas (para verificar)
       - name: Debug repo structure
         run: |
           echo "📂 Directorio actual:"
@@ -34,11 +34,11 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 4️⃣ Iniciar sesión en el Azure Container Registry
+      # 4️⃣ Iniciar sesión en Azure Container Registry
       - name: Log in to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 5️⃣ Construir y subir la imagen Docker
+      # 5️⃣ Construir y subir imagen Docker
       - name: Build and Push Docker image
         run: |
           docker build . -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
@@ -51,33 +51,18 @@ jobs:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.AKS_CLUSTER }}
 
-      # 7️⃣ Buscar deployment.yaml y service.yaml automáticamente
-      - name: Find YAML manifests
-        id: find
+      # 7️⃣ Verificar carpeta k8s en raíz del repo
+      - name: Verify k8s folder
         run: |
-          echo "🔍 Buscando deployment.yaml y service.yaml..."
-          DEPLOY=$(find $GITHUB_WORKSPACE -type f -name "deployment.yaml" | head -n 1)
-          SERVICE=$(find $GITHUB_WORKSPACE -type f -name "service.yaml" | head -n 1)
-          
-          if [ -z "$DEPLOY" ]; then
-            echo "❌ ERROR: No se encontró deployment.yaml"; exit 1;
-          fi
-          if [ -z "$SERVICE" ]; then
-            echo "⚠️ ADVERTENCIA: No se encontró service.yaml (continuando solo con deployment)";
-          fi
-          
-          echo "deployment=$DEPLOY" >> $GITHUB_OUTPUT
-          echo "service=$SERVICE" >> $GITHUB_OUTPUT
-          echo "✅ Encontrados:"
-          echo "Deployment: $DEPLOY"
-          echo "Service: $SERVICE"
+          echo "📂 Contenido de la carpeta k8s:"
+          ls -la k8s
 
-      # 8️⃣ Desplegar automáticamente usando los YAML encontrados
+      # 8️⃣ Desplegar a AKS usando los YAML en raíz/k8s
       - name: Deploy to AKS
         uses: azure/k8s-deploy@v4
         with:
           manifests: |
-            ${{ steps.find.outputs.deployment }}
-            ${{ steps.find.outputs.service }}
+            k8s/deployment.yaml
+            k8s/service.yaml
           images: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
