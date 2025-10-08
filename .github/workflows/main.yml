@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:  # 👈 Agregamos esto para habilitar ejecuciones manuales
 
 env:
   ACR_NAME: proyectossd
@@ -66,7 +67,7 @@ jobs:
           echo "Deployment: $DEPLOY"
           echo "Service: $SERVICE"
 
-      # 8️⃣ Verificar si realmente se encontraron
+      # 8️⃣ Validar que los archivos se encontraron
       - name: Validate found files
         run: |
           if [ -z "${{ steps.find.outputs.deployment }}" ] || [ -z "${{ steps.find.outputs.service }}" ]; then
