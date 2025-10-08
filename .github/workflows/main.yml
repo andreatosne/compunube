@@ -16,16 +16,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Obtener el código del repositorio
-      - name: Checkout code
+      # 1️⃣ Descargar el repositorio completo
+      - name: Checkout full repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # 2️⃣ Mostrar estructura de carpetas (para verificar)
+      # 2️⃣ Mostrar estructura completa del proyecto
       - name: Debug repo structure
         run: |
           echo "📂 Directorio actual:"
           pwd
-          echo "📄 Archivos encontrados:"
+          echo "📄 Estructura completa del repositorio:"
           ls -R
 
       # 3️⃣ Iniciar sesión en Azure
@@ -34,35 +36,48 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 4️⃣ Iniciar sesión en Azure Container Registry
+      # 4️⃣ Iniciar sesión en el Azure Container Registry
       - name: Log in to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 5️⃣ Construir y subir imagen Docker
+      # 5️⃣ Construir y subir la imagen Docker al ACR
       - name: Build and Push Docker image
         run: |
           docker build . -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
 
-      # 6️⃣ Establecer contexto de AKS
+      # 6️⃣ Conectarse al clúster de AKS
       - name: Set AKS context
         uses: azure/aks-set-context@v3
         with:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.AKS_CLUSTER }}
 
-      # 7️⃣ Verificar carpeta k8s en raíz del repo
-      - name: Verify k8s folder
+      # 7️⃣ Verificar archivos YAML en todo el repositorio
+      - name: Find YAML manifests
+        id: find
         run: |
-          echo "📂 Contenido de la carpeta k8s:"
-          ls -la k8s
+          echo "🔍 Buscando deployment.yaml y service.yaml..."
+          DEPLOY=$(find $GITHUB_WORKSPACE -name "deployment.yaml" | head -n 1)
+          SERVICE=$(find $GITHUB_WORKSPACE -name "service.yaml" | head -n 1)
+          echo "deployment=${DEPLOY}" >> $GITHUB_OUTPUT
+          echo "service=${SERVICE}" >> $GITHUB_OUTPUT
+          echo "✅ Archivos encontrados:"
+          echo "Deployment: $DEPLOY"
+          echo "Service: $SERVICE"
 
-      # 8️⃣ Desplegar a AKS usando los YAML en raíz/k8s
+      # 8️⃣ Listar todos los archivos YAML por diagnóstico adicional
+      - name: List all YAML files (debug)
+        run: |
+          echo "📜 Todos los YAML detectados en el repositorio:"
+          find $GITHUB_WORKSPACE -name "*.yaml" -type f
+
+      # 9️⃣ Desplegar en AKS usando los archivos encontrados
       - name: Deploy to AKS
         uses: azure/k8s-deploy@v4
         with:
           manifests: |
-            k8s/deployment.yaml
-            k8s/service.yaml
+            ${{ steps.find.outputs.deployment }}
+            ${{ steps.find.outputs.service }}
           images: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_number }}
